@@ -187,6 +187,42 @@ def test_get_returns_none_for_missing_id():
     mock_index.fetch.assert_called_once_with("missing_id")
 
 
+def test_get_returns_none_when_redisvl_fetches_empty_dict():
+    """redisvl returns {} for a missing id, not just None."""
+    db, mock_index = _make_redis_db()
+    mock_index.fetch.return_value = {}
+
+    assert db.get("missing_id") is None
+    mock_index.fetch.assert_called_once_with("missing_id")
+
+
+def test_get_preserves_existing_memory_payload():
+    """Handling absent Redis keys must not affect valid memory reads."""
+    db, mock_index = _make_redis_db()
+    mock_index.fetch.return_value = {
+        "memory_id": "existing_id",
+        "hash": "hash-1",
+        "memory": "stored text",
+        "created_at": 1704067200,
+        "updated_at": 1704153600,
+        "user_id": "user-1",
+        "metadata": json.dumps({"source": "test"}),
+    }
+
+    result = db.get("existing_id")
+
+    assert result.id == "existing_id"
+    assert result.payload == {
+        "hash": "hash-1",
+        "data": "stored text",
+        "created_at": "2024-01-01T00:00:00.000000+00:00",
+        "updated_at": "2024-01-02T00:00:00.000000+00:00",
+        "user_id": "user-1",
+        "source": "test",
+    }
+    mock_index.fetch.assert_called_once_with("existing_id")
+
+
 def test_insert_entity_payload_without_hash_and_created_at():
     """insert() must not crash on entity payloads that lack hash/created_at."""
     db, mock_index = _make_redis_db()
